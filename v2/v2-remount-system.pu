@@ -1,0 +1,111 @@
+@startuml
+header v2 remount system
+title V2 remount system
+
+autonumber
+
+participant IndexHtml
+
+box "React"
+    participant App
+    participant Routing
+    participant DivisionAssemble
+    participant Mounter
+    participant Remount
+end box
+
+box "entity"
+    participant MFE
+    participant RoutingMap
+end box
+
+box "window"
+    participant WindowPubSub
+    participant ManifestRegistry
+    participant Loadjs
+    participant MFEMountEventListener
+    participant MFEDidMountEventListener
+end box
+
+box "MFE"
+    participant MFEScripts
+    participant MFEComponent
+end box
+
+/'
+mount phase
+'/
+
+IndexHtml -> App ++ : initialize
+
+App -> Routing ++ : render
+
+Routing -> RoutingMap ++ : get path
+RoutingMap --> Routing: path
+deactivate RoutingMap
+
+Routing -> DivisionAssemble ++ : render
+
+DivisionAssemble -> MFE ++ : get(segment, label)
+MFE --> DivisionAssemble: MFF object
+deactivate MFE
+
+DivisionAssemble -> Mounter ++ : render(MFEObject)
+
+Mounter -> WindowPubSub: (expose location)
+Mounter -> Remount ++ : render(MFEObject)
+
+Remount -> MFEDidMountEventListener ++ : append listener with handler
+Remount -> ManifestRegistry: get manifest & url
+ManifestRegistry --> Remount: manifest, url
+Remount -> Remount: convertToMFEurl(manifest, url)
+Remount -> Loadjs ++ : load(MFEurl)
+
+Loadjs -> MFEScripts ++ : load scripts
+
+MFEScripts -> MFEMountEventListener ++ : append listener
+MFEScripts --> Loadjs: did load
+deactivate MFEScripts
+
+Loadjs --> Remount: Promise
+deactivate Loadjs
+
+Remount -> MFEMountEventListener: dispatchEvent(element)
+
+MFEMountEventListener -> MFEComponent ++ : exec render(element)
+MFEComponent -> MFEComponent: mount on element
+MFEComponent -> MFEDidMountEventListener: dispatchEvent(adapter)
+MFEDidMountEventListener -> Remount: exec handler(adapter)
+Remount -> Remount: store adapter
+
+/'
+  unmount phase
+'/
+
+Routing -> Routing: change path
+Routing -> DivisionAssemble: unmount
+DivisionAssemble -> Mounter: unmount
+Mounter -> Remount: unmount
+
+Remount -> Remount: get adapter
+Remount -> MFEComponent: execute unmount
+
+MFEComponent -> MFEComponent: unmount(element)
+deactivate MFEComponent
+
+Remount -> MFEDidMountEventListener: ramove listener
+deactivate MFEDidMountEventListener
+
+Remount --> Mounter: did unmount
+deactivate Remount
+
+Mounter --> DivisionAssemble: did unmount
+deactivate Mounter
+
+DivisionAssemble --> Routing: did unmount
+deactivate DivisionAssemble
+
+Routing -> DivisionAssemble: render next
+
+
+@enduml
